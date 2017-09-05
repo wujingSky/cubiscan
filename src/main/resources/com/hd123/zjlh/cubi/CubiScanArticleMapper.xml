@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.hd123.zjlh.cubi.service.dao.CubiScanArticleDao">
+	<resultMap type="com.hd123.zjlh.cubi.api.CubiScanArticle" id="CubiScanArticleMap">
+		<result column="uuid" property="uuid" jdbcType="VARCHAR" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="qpcStr" property="qpcStr" jdbcType="VARCHAR" />
+		<result column="maxLength" property="maxLength" jdbcType="DECIMAL" />
+		<result column="maxWidth" property="maxWidth" jdbcType="DECIMAL" />
+		<result column="maxHeight" property="maxHeight" jdbcType="DECIMAL" />
+		<result column="maxWeight" property="maxWeight" jdbcType="DECIMAL" />
+		
+		<result column="midLength" property="midLength" jdbcType="DECIMAL" />
+		<result column="midWidth" property="midWidth" jdbcType="DECIMAL" />
+		<result column="midHeight" property="midHeight" jdbcType="DECIMAL" />
+		<result column="midWeight" property="midWeight" jdbcType="DECIMAL" />
+		
+		<result column="minLength" property="minLength" jdbcType="DECIMAL" />
+		<result column="minWidth" property="minWidth" jdbcType="DECIMAL" />
+		<result column="minHeight" property="minHeight" jdbcType="DECIMAL" />
+		<result column="minWeight" property="minWeight" jdbcType="DECIMAL" />	
+	</resultMap>
+
+	<resultMap type="com.hd123.zjlh.cubi.api.Article"
+		id="ArticleMap">
+		<result column="uuid" property="uuid" jdbcType="VARCHAR" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="spec" property="spec" jdbcType="VARCHAR" />
+	</resultMap>
+	
+	<resultMap type="com.hd123.zjlh.cubi.api.CubiScanArticleQpcStr"
+		id="ArticleQpcStrMap">
+		<result column="articleUuid" property="uuid" jdbcType="VARCHAR" />
+		<result column="articleCode" property="code" jdbcType="VARCHAR" />
+		<result column="articleName" property="name" jdbcType="VARCHAR" />
+		<result column="qpcStr" property="qpcStr" jdbcType="VARCHAR" />
+		<result column="type" property="type" jdbcType="VARCHAR" />
+		<result column="length" property="length" jdbcType="DECIMAL" />
+		<result column="width" property="width" jdbcType="DECIMAL" />
+		<result column="height" property="height" jdbcType="DECIMAL" />
+		<result column="weight" property="weight" jdbcType="DECIMAL" />
+	</resultMap>
+
+	<select id="query" resultMap="CubiScanArticleMap">
+select t.uuid,
+       t.code,
+       t.name,
+       t.maxQpcStr,
+       max(t.maxLength) maxLength,
+       max(t.maxWidth) maxWidth,
+       max(t.maxHeight) maxHeight,
+       max(t.maxWeight) maxWeight,
+       t.midqpcstr midqpcstr,
+       max(t.midlength) midlength,
+       max(t.midwidth) midwidth,
+       max(t.midheight) midheight,
+       max(t.midweight) midweight,
+       '1*1*1' minqpcstr,
+       max(t.minLength) minLength,
+       max(t.minWidth) minWidth,
+       max(t.minHeight) minHeight,
+       max(t.minWeight) minWeight,
+       max(t.measureTime) measureTime
+  from (select i.articleuuid uuid,
+               i.articlecode code,
+               i.articlename name,
+               i.qpcstr maxQpcStr,
+               i.length maxLength,
+               i.width maxWidth,
+               i.height maxHeight,
+               i.weight maxWeight,
+               j.qpcstr midqpcstr,
+               j.length midlength,
+               j.width midwidth,
+               j.height midheight,
+               j.weight midweight,
+               '' minqpcstr,
+               0 minlength,
+               0 minwidth,
+               0 minheight,
+               0 minweight,
+               i.measuretime
+          from wmscubiscanarticle i
+          left join wmscubiscanarticle j
+            on (i.articleuuid = j.articleuuid and i.midqpcstr = j.qpcstr)
+         where i.type = 'MAXQPCSTR'
+        union all
+        select i.articleuuid uuid,
+               i.articlecode code,
+               i.articlename name,
+               i.maxqpcstr maxQpcStr,
+               0 maxLength,
+               0 maxWidth,
+               0 maxHeight,
+               0 maxWeight,
+               i.midqpcstr midqpcStr,
+               0 midLength,
+               0 midWidth,
+               0 midHeight,
+               0 midWeight,
+               i.qpcstr minqpcStr,
+               i.length minLength,
+               i.width minWidth,
+               i.height minHeight,
+               i.weight minWeight,
+               i.measuretime
+          from wmscubiscanarticle i
+         where i.type = 'MINQPCSTR'
+        union all
+        select i.articleuuid uuid,
+               i.articlecode code,
+               i.articlename name,
+               i.maxqpcstr,
+               0 maxLength,
+               0 maxWidth,
+               0 maxHeight,
+               0 maxWeight,
+               i.qpcstr midqpcstr,
+               i.length midlength,
+               i.width midwidth,
+               i.height midheight,
+               i.weight midweight,
+               '1*1*1' minqpcstr,
+               0 minlength,
+               0 minwidth,
+               0 minheight,
+               0 minweight,
+               i.measuretime
+          from wmscubiscanarticle i
+         where i.type = 'MIDQPCSTR') t
+        where t.maxQpcStr is not null
+        -- and t.measuretime > sysdate - 1
+        --and to_char(t.measuretime,'yyyy-MM-DD') = to_char(sysdate-1,'yyyy-MM-DD')
+ group by t.uuid, t.code, t.name, t.maxQpcStr,t.midqpcstr
+ order by measuretime desc
+    </select>
+
+	<select id="getArticle" resultMap="ArticleMap">
+		select a.auuid uuid,a.code code,a.name name,a.spec spec 
+		from mv_mdm_articlebarcode t,mv_mdm_article a 
+		where t.articleuuid = a.auuid
+		and t.barcode = #{_parameter}
+	</select>
+
+	<select id="get" resultMap="ArticleQpcStrMap">
+		select t.* from wmscubiscanArticle t
+		where t.articleuuid = #{uuid}
+	</select>
+
+	<select id="queryArticleQpcStrs" resultType="java.lang.String" parameterType="java.lang.String">
+		select a.qpcStr from mv_mdm_articleqpc a 
+ 		where a.articleuuid = #{_parameter} 
+	</select>
+
+	<delete id="remove" parameterType="java.lang.String">
+		delete from
+		wmscubiscanArticle t
+		where t.articleuuid = #{uuid}
+		and t.qpcStr = #{qpcStr}
+	</delete>
+
+	<insert id="saveCubiScanArticle" parameterType="com.hd123.zjlh.cubi.api.CubiScanArticleQpcStr">
+		insert into
+		wmscubiscanArticle(
+		articleUuid,
+		articleCode,
+		articleName,
+		qpcStr,
+		type,
+		length,
+		width,
+		height,
+		weight,
+		measureTime,
+		midQpcStr,
+		maxQpcStr
+		)
+		values
+		(
+		#{uuid,jdbcType=VARCHAR},
+		#{code,jdbcType=VARCHAR},
+		#{name,jdbcType=VARCHAR},
+		#{qpcStr,jdbcType=VARCHAR},
+		#{type,jdbcType=VARCHAR},
+		#{length,jdbcType=DECIMAL},
+		#{width,jdbcType=DECIMAL},
+		#{height,jdbcType=DECIMAL},
+		#{weight,jdbcType=DECIMAL},
+		#{measureTime,jdbcType=TIMESTAMP},
+		#{midQpcStr,jdbcType=VARCHAR},
+		#{maxQpcStr,jdbcType=VARCHAR})
+	</insert>
+</mapper>
